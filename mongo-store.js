@@ -240,7 +240,7 @@ module.exports = function(opts) {
           } else {
             return coll.insert(entp, function(err, inserts) {
               if (!error(args, err, cb)) {
-                ent.id = idstr(inserts.insertedIds[0]._id);
+                ent.id = idstr(inserts.ops[0]._id);
                 seneca.log.debug('save/insert', ent, desc);
                 return cb(null, ent);
               }
