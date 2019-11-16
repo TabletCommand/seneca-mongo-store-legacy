@@ -144,7 +144,7 @@ function extratest(si, done) {
         });
         cl.list$({}, function(err, lst) {
           assert.ok(null == err);
-          assert.equal(3, lst.length);
+          assert.equal(2, lst.length);
           return cb();
         })
       },
@@ -183,7 +183,7 @@ function extratest(si, done) {
         });
         cl.list$({
           limit$: 5,
-          skip$: 2
+          skip$: 1
         }, function(err, lst) {
           assert.ok(null == err);
           assert.equal(1, lst.length);
