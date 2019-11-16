@@ -1,8 +1,8 @@
 /* Copyright (c) 2010-2015 Richard Rodger, MIT License */
 "use strict";
 
-var _ = require('lodash');
-var mongo = require('mongodb');
+var _ = require("lodash");
+var mongo = require("mongodb");
 
 var name = "mongo-store-legacy";
 
@@ -12,132 +12,135 @@ native$ = array => use first elem as query, second elem as meta settings
 */
 
 function idstr(obj) {
-  return (obj && obj.toHexString) ? obj.toHexString() : '' + obj;
+  return (obj && obj.toHexString) ? obj.toHexString() : "" + obj;
 }
 
 function makeid(hexstr) {
   if (_.isString(hexstr) && 24 == hexstr.length) {
     try {
       if (mongo.BSONNative) {
-        return new mongo.BSONNative.ObjectID(hexstr)
+        return new mongo.BSONNative.ObjectID(hexstr);
       } else {
-        return new mongo.BSONPure.ObjectID(hexstr)
+        return new mongo.BSONPure.ObjectID(hexstr);
       }
     } catch (e) {
       return hexstr;
     }
-  } else return hexstr;
+  } else {
+    return hexstr;
+  }
 }
 
 function fixquery(qent, q) {
   var qq = {};
-
   if (!q.native$) {
     for (var qp in q) {
       if (!qp.match(/\$$/)) {
-        qq[qp] = q[qp]
+        qq[qp] = q[qp];
       }
     }
     if (qq.id) {
-      qq._id = makeid(qq.id)
-      delete qq.id
+      qq._id = makeid(qq.id);
+      delete qq.id;
     }
   } else {
-    qq = _.isArray(q.native$) ? q.native$[0] : q.native$
+    qq = _.isArray(q.native$) ? q.native$[0] : q.native$;
   }
-
-  return qq
+  return qq;
 }
 
 function metaquery(qent, q) {
   var mq = {}
 
   if (!q.native$) {
-
     if (q.sort$) {
-      for (var sf in q.sort$) break;
-      var sd = q.sort$[sf] < 0 ? 'descending' : 'ascending'
+      for (var sf in q.sort$) {
+        break;
+      }
+      var sd = q.sort$[sf] < 0 ? "descending" : "ascending";
       mq.sort = [
         [sf, sd]
-      ]
+      ];
     }
 
     if (q.limit$) {
-      mq.limit = q.limit$
+      mq.limit = q.limit$;
     }
 
     if (q.skip$) {
-      mq.skip = q.skip$
+      mq.skip = q.skip$;
     }
 
     if (q.fields$) {
-      mq.fields = q.fields$
+      mq.fields = q.fields$;
     }
   } else {
-    mq = _.isArray(q.native$) ? q.native$[1] : mq
+    mq = _.isArray(q.native$) ? q.native$[1] : mq;
   }
 
-  return mq
+  return mq;
 }
 
 module.exports = function(opts) {
-  var seneca = this
-  var desc
+  var seneca = this;
+  var desc;
 
-  var dbinst = null
-  var collmap = {}
-  var specifications = null
+  var dbinst = null;
+  var collmap = {};
+  var specifications = null;
 
   function error(args, err, cb) {
     if (err) {
-      seneca.log.error('entity', err, {
+      seneca.log.error("entity", err, {
         store: name
-      })
+      });
       return true;
-    } else return false;
+    } else {
+      return false;
+    }
   }
 
   function configure(spec, cb) {
-    specifications = spec
+    specifications = spec;
 
     // defer connection
     // TODO: expose connection action
     if (!_.isUndefined(spec.connect) && !spec.connect) {
-      return cb()
+      return cb();
     }
 
-    var conf = 'string' == typeof(spec) ? null : spec
+    var conf = "string" == typeof(spec) ? null : spec;
 
     if (!conf) {
-      conf = {}
+      conf = {};
       var urlM = /^mongo:\/\/((.*?):(.*?)@)?(.*?)(:?(\d+))?\/(.*?)$/.exec(spec);
-      conf.name = urlM[7]
-      conf.port = urlM[6]
-      conf.server = urlM[4]
-      conf.username = urlM[2]
-      conf.password = urlM[3]
+      conf.name = urlM[7];
+      conf.port = urlM[6];
+      conf.server = urlM[4];
+      conf.username = urlM[2];
+      conf.password = urlM[3];
 
-      conf.port = conf.port ? parseInt(conf.port, 10) : null
+      conf.port = conf.port ? parseInt(conf.port, 10) : null;
     }
 
-    conf.host = conf.host || conf.server
-    conf.username = conf.username || conf.user
-    conf.password = conf.password || conf.pass
+    conf.host = conf.host || conf.server;
+    conf.username = conf.username || conf.user;
+    conf.password = conf.password || conf.pass;
 
     var dbopts = seneca.util.deepextend({
       native_parser: false,
       auto_reconnect: true,
       w: 1
-    }, conf.options)
+    }, conf.options);
 
     if (conf.replicaset) {
-      var rservs = []
+      var rservs = [];
       for (var i = 0; i < conf.replicaset.servers.length; i++) {
-        var servconf = conf.replicaset.servers[i]
-        rservs.push(new mongo.Server(servconf.host, servconf.port, dbopts))
+        var servconf = conf.replicaset.servers[i];
+        rservs.push(new mongo.Server(servconf.host, servconf.port, dbopts));
       }
-      var rset = new mongo.ReplSetServers(rservs)
-      dbinst = new mongo.Db(conf.name, rset, dbopts)
+      var rset = new mongo.ReplSetServers(rservs);
+      dbinst = new mongo.Db(conf.name, rset, dbopts);
     } else {
       dbinst = new mongo.Db(
         conf.name,
@@ -146,7 +149,7 @@ module.exports = function(opts) {
           conf.port || mongo.Connection.DEFAULT_PORT, {}
         ),
         dbopts
-      )
+      );
     }
 
     dbinst.open(function(err) {
@@ -157,7 +160,7 @@ module.exports = function(opts) {
       if (conf.username) {
         dbinst.authenticate(conf.username, conf.password, function(err) {
           if (err) {
-            seneca.log.error('init', 'db auth failed for ' + conf.username, dbopts)
+            seneca.log.error('init', 'db auth failed for ' + conf.username, dbopts);
             return cb(err);
           }
 
@@ -181,7 +184,7 @@ module.exports = function(opts) {
     if (!collmap[collname]) {
       dbinst.collection(collname, function(err, coll) {
         if (!error(args, err, cb)) {
-          collmap[collname] = coll
+          collmap[collname] = coll;
           return cb(null, coll);
         }
       })
@@ -195,21 +198,23 @@ module.exports = function(opts) {
 
     close: function(args, cb) {
       if (dbinst) {
-        dbinst.close(cb)
-      } else return cb();
+        dbinst.close(cb);
+      } else {
+        return cb();
+      }
     },
 
     save: function(args, cb) {
       var ent = args.ent;
       var update = !!ent.id;
 
-      getcoll(args, ent, function(err, coll) {
+      return getcoll(args, ent, function(err, coll) {
         if (!error(args, err, cb)) {
           var entp = {};
 
           var fields = ent.fields$();
           fields.forEach(function(field) {
-            entp[field] = ent[field]
+            entp[field] = ent[field];
           });
 
           if (!update && void 0 != ent.id$) {
@@ -218,11 +223,11 @@ module.exports = function(opts) {
 
           if (update) {
             var q = {
-              _id: makeid(ent.id);
-            }
+              _id: makeid(ent.id)
+            };
             delete entp.id;
 
-            coll.update(q, {
+            return coll.update(q, {
               $set: entp
             }, {
               upsert: true
@@ -231,19 +236,18 @@ module.exports = function(opts) {
                 seneca.log.debug('save/update', ent, desc);
                 return cb(null, ent);
               }
-            })
+            });
           } else {
-            coll.insert(entp, function(err, inserts) {
+            return coll.insert(entp, function(err, inserts) {
               if (!error(args, err, cb)) {
                 ent.id = idstr(inserts[0]._id);
-
                 seneca.log.debug('save/insert', ent, desc);
                 return cb(null, ent);
               }
-            })
+            });
           }
         }
-      })
+      });
     },
 
 
@@ -251,18 +255,17 @@ module.exports = function(opts) {
       var qent = args.qent;
       var q = args.q;
 
-      getcoll(args, qent, function(err, coll) {
+      return getcoll(args, qent, function(err, coll) {
         if (!error(args, err, cb)) {
           var mq = metaquery(qent, q);
           var qq = fixquery(qent, q);
 
-          coll.findOne(qq, mq, function(err, entp) {
+          return coll.findOne(qq, mq, function(err, entp) {
             if (!error(args, err, cb)) {
               var fent = null;
               if (entp) {
-                entp.id = idstr(entp._id)
+                entp.id = idstr(entp._id);
                 delete entp._id;
-
                 fent = qent.make$(entp);
               }
 
@@ -271,20 +274,19 @@ module.exports = function(opts) {
             }
           });
         }
-      })
+      });
     },
 
-
     list: function(args, cb) {
-      var qent = args.qent
-      var q = args.q
+      var qent = args.qent;
+      var q = args.q;
 
-      getcoll(args, qent, function(err, coll) {
+      return getcoll(args, qent, function(err, coll) {
         if (!error(args, err, cb)) {
           var mq = metaquery(qent, q);
           var qq = fixquery(qent, q);
 
-          coll.find(qq, mq, function(err, cur) {
+          return coll.find(qq, mq, function(err, cur) {
             if (!error(args, err, cb)) {
               var list = [];
 
@@ -303,11 +305,11 @@ module.exports = function(opts) {
                     return cb(null, list);
                   }
                 }
-              })
+              });
             }
-          })
+          });
         }
-      })
+      });
     },
 
     remove: function(args, cb) {
@@ -317,29 +319,30 @@ module.exports = function(opts) {
       var all = q.all$; // default false
       var load = _.isUndefined(q.load$) ? true : q.load$; // default true
 
-      getcoll(args, qent, function(err, coll) {
+      return getcoll(args, qent, function(err, coll) {
         if (!error(args, err, cb)) {
           var qq = fixquery(qent, q);
 
           if (all) {
-            coll.remove(qq, function(err) {
-              seneca.log.debug('remove/all', q, desc)
+            return coll.remove(qq, function(err) {
+              seneca.log.debug('remove/all', q, desc);
               return cb(err);
-            })
+            });
           } else {
             var mq = metaquery(qent, q);
-            coll.findOne(qq, mq, function(err, entp) {
+            return coll.findOne(qq, mq, function(err, entp) {
               if (!error(args, err, cb)) {
                 if (entp) {
-                  coll.remove({
+                  return coll.remove({
                     _id: entp._id
                   }, function(err) {
-                    seneca.log.debug('remove/one', q, entp, desc)
-
-                    var ent = load ? entp : null
+                    seneca.log.debug('remove/one', q, entp, desc);
+                    var ent = load ? entp : null;
                     return cb(err, ent);
                   })
-                } else return cb(null);
+                } else {
+                  return cb(null);
+                }
               }
             });
           }
@@ -348,9 +351,9 @@ module.exports = function(opts) {
     },
 
     native: function(args, done) {
-      dbinst.collection('seneca', function(err, coll) {
+      return dbinst.collection('seneca', function(err, coll) {
         if (!error(args, err, done)) {
-          coll.findOne({}, {}, function(err, entp) {
+          return coll.findOne({}, {}, function(err, entp) {
             if (!error(args, err, done)) {
               return done(null, dbinst);
             } else {
@@ -371,17 +374,17 @@ module.exports = function(opts) {
     init: store.name,
     tag: meta.tag
   }, function(args, done) {
-    configure(opts, function(err) {
+    return configure(opts, function(err) {
       if (err) return seneca.die('store', err, {
         store: store.name,
         desc: desc
       });
       return done();
-    })
-  })
+    });
+  });
 
   return {
     name: store.name,
     tag: meta.tag
   };
-}
+};
