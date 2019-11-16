@@ -65,13 +65,13 @@ function extratest(si, done) {
 
       native_query: function(cb) {
         var nat = si.make$('nat');
-        nat.remove$({
+        return nat.remove$({
           all$: true
         }, function(err) {
           assert.ok(null == err);
 
           nat.a = 1;
-          nat.save$(function(err, nat) {
+          return nat.save$(function(err, nat) {
             assert.ok(null == err);
 
             nat = nat.make$();
@@ -88,7 +88,7 @@ function extratest(si, done) {
                   ]
                 }]
               }, function(err, list) {
-                assert.ok(null == err)
+                assert.ok(null == err);
                 //console.log(list)
                 assert.equal(2, list.length);
                 assert.equal(2, list[0].a);
