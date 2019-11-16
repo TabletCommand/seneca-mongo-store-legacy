@@ -6,7 +6,7 @@ var assert = require("assert");
 var seneca = require("seneca");
 var async = require("async");
 
-var shared = require("seneca-store-test");
+var shared = require("./seneca-store-test");
 
 var si = seneca();
 si.use(require('..'), {
