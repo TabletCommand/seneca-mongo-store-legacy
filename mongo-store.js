@@ -81,13 +81,12 @@ function metaquery(qent, q) {
   return mq;
 }
 
-module.exports = function(opts) {
+module.exports = function exportsMongoStore(opts) {
   var seneca = this;
   var desc;
 
   var dbinst = null;
   var collmap = {};
-  var specifications = null;
 
   function error(args, err, cb) {
     if (err) {
@@ -101,8 +100,6 @@ module.exports = function(opts) {
   }
 
   function configure(spec, cb) {
-    specifications = spec;
-
     // defer connection
     // TODO: expose connection action
     if (!_.isUndefined(spec.connect) && !spec.connect) {
