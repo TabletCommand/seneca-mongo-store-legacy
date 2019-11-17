@@ -3,6 +3,8 @@
 
 var _ = require("lodash");
 var mongo = require("mongodb");
+var MongoClient = mongo.MongoClient;
+var ObjectID = mongo.ObjectID;
 
 var name = "mongo-store-legacy";
 
@@ -16,19 +18,14 @@ function idstr(obj) {
 }
 
 function makeid(hexstr) {
-  if (_.isString(hexstr) && 24 == hexstr.length) {
+  if (_.isString(hexstr) && 24 === hexstr.length) {
     try {
-      if (mongo.BSONNative) {
-        return new mongo.BSONNative.ObjectID(hexstr);
-      } else {
-        return new mongo.BSONPure.ObjectID(hexstr);
-      }
+      return ObjectID.createFromHexString(hexstr);
     } catch (e) {
       return hexstr;
     }
-  } else {
-    return hexstr;
   }
+  return hexstr;
 }
 
 function fixquery(qent, q) {
@@ -93,13 +90,13 @@ module.exports = function exportsMongoStore(opts) {
       seneca.log.error("entity", err, {
         store: name
       });
-      return true;
+      return cb(err);
     } else {
       return false;
     }
   }
 
-  function configure(spec, cb) {
+  function configureold(spec, cb) {
     // defer connection
     // TODO: expose connection action
     if (!_.isUndefined(spec.connect) && !spec.connect) {
@@ -136,7 +133,7 @@ module.exports = function exportsMongoStore(opts) {
         var servconf = conf.replicaset.servers[i];
         rservs.push(new mongo.Server(servconf.host, servconf.port, dbopts));
       }
-      var rset = new mongo.ReplSetServers(rservs);
+      var rset = new mongo.ReplSet(rservs);
       dbinst = new mongo.Db(conf.name, rset, dbopts);
     } else {
       dbinst = new mongo.Db(
@@ -169,6 +166,45 @@ module.exports = function exportsMongoStore(opts) {
         return cb(null);
       }
     })
+  }
+
+  function configure(conf, cb) {
+    // defer connection
+    // TODO: expose connection action
+    if (!_.isUndefined(conf.connect) && !conf.connect) {
+      return cb();
+    }
+
+    // Turn the hash into a mongo uri
+    if (!conf.uri) {
+      conf.uri = 'mongodb://';
+      conf.uri += (conf.username) ? conf.username : '';
+      conf.uri += (conf.password) ? ':' + conf.password + '@' : '';
+      conf.uri += conf.host || conf.server;
+      conf.uri += (conf.port) ? ':' + conf.port : '';
+      conf.uri += '/' + (conf.db || conf.name);
+    }
+
+    // Extend the db options with some defaults
+    // See http://mongodb.github.io/node-mongodb-native/2.0/reference/connecting/connection-settings/ for options
+    var options = seneca.util.deepextend({
+      db: {},
+      server: {},
+      replset: {},
+      mongos: {}
+    }, conf.options);
+
+    // Connect using the URI
+    return MongoClient.connect(conf.uri, options, function(err, db) {
+      if (err) {
+        return seneca.die('connect', err, conf);
+      }
+
+      // Set the instance to use throughout the plugin
+      dbinst = db;
+      seneca.log.debug('init', 'db open', conf);
+      return cb(null);
+    });
   }
 
   function getcoll(args, ent, cb) {
@@ -224,7 +260,7 @@ module.exports = function exportsMongoStore(opts) {
             };
             delete entp.id;
 
-            return coll.update(q, {
+            return coll.updateOne(q, {
               $set: entp
             }, {
               upsert: true
@@ -235,9 +271,9 @@ module.exports = function exportsMongoStore(opts) {
               }
             });
           } else {
-            return coll.insert(entp, function(err, inserts) {
+            return coll.insertOne(entp, {}, function(err, inserts) {
               if (!error(args, err, cb)) {
-                ent.id = idstr(inserts.ops[0]._id);
+                ent.id = idstr(inserts.ops[0]._id)
                 seneca.log.debug('save/insert', ent, desc);
                 return cb(null, ent);
               }
@@ -321,7 +357,7 @@ module.exports = function exportsMongoStore(opts) {
           var qq = fixquery(qent, q);
 
           if (all) {
-            return coll.remove(qq, function(err) {
+            return coll.deleteMany(qq, {}, function(err) {
               seneca.log.debug('remove/all', q, desc);
               return cb(err);
             });
@@ -330,9 +366,10 @@ module.exports = function exportsMongoStore(opts) {
             return coll.findOne(qq, mq, function(err, entp) {
               if (!error(args, err, cb)) {
                 if (entp) {
-                  return coll.remove({
+                  var deleteOneQuery = {
                     _id: entp._id
-                  }, function(err) {
+                  };
+                  return coll.deleteOne(deleteOneQuery, {}, function(err) {
                     seneca.log.debug('remove/one', q, entp, desc);
                     var ent = load ? entp : null;
                     return cb(err, ent);
