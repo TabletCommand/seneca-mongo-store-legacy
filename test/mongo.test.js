@@ -3,20 +3,16 @@
 
 var assert = require("assert");
 
-var seneca = require("seneca");
+var seneca = require("seneca-legacy");
 var async = require("async");
 
 var shared = require("./seneca-store-test");
 
+var mongoUrl = process.env.NODE_MONGO_URL || false;
+
 var si = seneca();
 si.use(require('..'), {
-  name: "senecatest",
-  host: "127.0.0.1",
-  port: 27017,
-  options: {
-    // uncomment to test
-    // native_parser:true
-  }
+  url: mongoUrl
 });
 
 si.__testcount = 0;
