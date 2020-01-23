@@ -82,6 +82,7 @@ module.exports = function exportsMongoStore(opts) {
   var seneca = this;
   var desc;
 
+  var client = null;
   var dbinst = null;
   var collmap = {};
 
@@ -98,13 +99,14 @@ module.exports = function exportsMongoStore(opts) {
 
   function configure(conf, cb) {
     // Connect using Mongo URL
-    return MongoClient.connect(conf.url, function(err, db) {
+    return MongoClient.connect(conf.url, function(err, mongoClient) {
       if (err) {
         return seneca.die('connect', err, conf);
       }
 
       // Set the instance to use throughout the plugin
-      dbinst = db;
+      client = mongoClient;
+      dbinst = mongoClient.db();
       seneca.log.debug('init', 'db open', conf);
       return cb(null);
     });
@@ -134,7 +136,7 @@ module.exports = function exportsMongoStore(opts) {
 
     close: function(args, cb) {
       if (dbinst) {
-        dbinst.close(cb);
+        client.close(cb);
       } else {
         return cb();
       }
