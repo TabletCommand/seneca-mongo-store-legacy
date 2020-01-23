@@ -99,7 +99,10 @@ module.exports = function exportsMongoStore(opts) {
 
   function configure(conf, cb) {
     // Connect using Mongo URL
-    return MongoClient.connect(conf.url, function(err, mongoClient) {
+    var mongoOpts = {
+      useUnifiedTopology: true
+    };
+    return MongoClient.connect(conf.url, mongoOpts, function(err, mongoClient) {
       if (err) {
         return seneca.die('connect', err, conf);
       }
